@@ -1,0 +1,5 @@
+matplotlib==3.8.1
+numpy==1.26.0
+polars==19.12
+scipy==1.11.3
+zstandard==0.22.0

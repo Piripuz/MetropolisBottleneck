@@ -1,0 +1,5 @@
+execs/
+graph/
+runs/
+__pycache__/
+docs/**/*.pdf
