@@ -375,7 +375,11 @@ def equilibrium(params):
     denominator = optimize.bisect(
         diff_integral, max(1e-16, min_denominator - 1), max_denominator + 1
     )
-    print("Surplus (theoretical): {:.4f}".format(np.log(denominator) + np.euler_gamma))
+    print(
+        "Surplus (theoretical): {:.4f}".format(
+            params["mu"] * (np.log(denominator) + np.euler_gamma)
+        )
+    )
     times = equilibrium_conditional(denominator, params)
     # If `t_hat` is not in `times`, it is equal to `t_tilde`.
     t_hat = times.get("t_hat", times["t_tilde"])
