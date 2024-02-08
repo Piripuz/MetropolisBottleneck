@@ -25,6 +25,11 @@ TT0 = 30.0
 # Path to the METROPOLIS2 executable.
 METROPOLIS_EXEC = "./execs/metropolis"
 
+# Width of the departure-time choice intervals (for Multinomial logit departure time only).
+DT_WIDTH = 60.0
+# Bins of the departure-time choice intervals (for Multinomial logit departure time only).
+DT_BINS = list(np.arange(PERIOD[0] + DT_WIDTH / 2, PERIOD[1], DT_WIDTH))
+
 
 def seconds_to_time_str(t):
     h = int(t // 3600)
@@ -41,6 +46,7 @@ def get_agents(
     uniform_epsilons=False,
     random_seed=None,
     tstar_std=0.0,
+    multinomial=False,
 ):
     agents = list()
     if random_seed is None:
@@ -92,6 +98,23 @@ def get_agents(
             departure_time_model = {
                 "type": "Constant",
                 "value": next(random_dt),
+            }
+        elif multinomial:
+            departure_time_model = {
+                "type": "DiscreteChoice",
+                "value": {
+                    "values": DT_BINS,
+                    "choice_model": {
+                        "type": "Deterministic",
+                        "value": {
+                            "u": next(random_u),
+                            "constants": list(
+                                rng.gumbel(scale=departure_time_mu, size=len(DT_BINS))
+                            ),
+                        },
+                    },
+                    "offset": rng.uniform(-DT_WIDTH / 2, DT_WIDTH / 2),
+                },
             }
         else:
             departure_time_model = {

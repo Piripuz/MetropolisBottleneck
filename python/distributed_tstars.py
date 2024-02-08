@@ -101,6 +101,7 @@ if __name__ == "__main__":
         print("Exp weight RMSE: {:.1E}".format(iter_df["exp_road_network_weights_rmse"][-1]))
         print("Dep. time RMSE: {:.1E}".format(iter_df["trip_dep_time_rmse"][-1]))
         print("Average travel time: {:.4f}s".format(iter_df["road_leg_travel_time_mean"][-1]))
+        print("Surplus: {:.4f}".format(iter_df["surplus_mean"][-1]))
 
     main_df = functions.read_iteration_results(MAIN_DIR)
 

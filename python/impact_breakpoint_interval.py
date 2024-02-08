@@ -105,6 +105,7 @@ if __name__ == "__main__":
         print("Dep. time RMSE: {:.1E}".format(df["trip_dep_time_rmse"][-1]))
 
         print("Average travel time: {:.4f}s".format(df["road_leg_travel_time_mean"][-1]))
+        print("Surplus: {:.4f}".format(df["surplus_mean"][-1]))
 
     # Departure-time RMSE.
     fig, ax = mpl_utils.get_figure(fraction=0.8)

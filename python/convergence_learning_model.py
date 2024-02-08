@@ -91,6 +91,7 @@ if __name__ == "__main__":
         print("Dep. time RMSE: {:.2E}".format(df["trip_dep_time_rmse"][-1]))
 
         print("Average travel time: {:.4f}s".format(df["road_leg_travel_time_mean"][-1]))
+        print("Surplus: {:.4f}".format(df["surplus_mean"][-1]))
         print(
             "Average congested travel time: {:.4f}s".format(
                 df["road_leg_travel_time_mean"][-1] - df["road_leg_road_time_mean"][-1]
