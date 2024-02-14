@@ -90,7 +90,7 @@ if __name__ == "__main__":
     print("Analyzing results")
     # Aggregate statistics.
     print("Average travel time: {:.4f}s".format(iter_df["road_leg_travel_time_mean"][-1]))
-    print("Surplus: {:.4f}".format(df["surplus_mean"][-1]))
+    print("Surplus: {:.4f}".format(iter_df["surplus_mean"][-1]))
 
     # Computing distance between theory and simulation.
     D = theoretical_solution.distance_theoretical(df, times, denominator, parameters)
