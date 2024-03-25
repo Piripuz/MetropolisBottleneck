@@ -1,7 +1,6 @@
 # The goal of this script is to run a METROPOLIS2 simulation with uniform epsilons and compare the
 # results to the theoretical solution.
 import os
-import json
 
 import numpy as np
 
@@ -35,23 +34,18 @@ if __name__ == "__main__":
 
     if not SKIP_RUN:
         print("Writing agents")
-        agents = functions.get_agents(N, departure_time_mu=MU, uniform_epsilons=True)
-        with open(os.path.join(RUN_DIR, "agents.json"), "w") as f:
-            f.write(json.dumps(agents))
+        functions.save_agents(RUN_DIR, nb_agents=N, departure_time_mu=MU, uniform_epsilons=True)
 
         print("Writing road network")
-        road_network = functions.get_road_network(bottleneck_flow=BOTTLENECK_FLOW)
-        with open(os.path.join(RUN_DIR, "road-network.json"), "w") as f:
-            f.write(json.dumps(road_network))
+        functions.save_road_network(RUN_DIR, bottleneck_flow=BOTTLENECK_FLOW)
 
         print("Writing parameters")
-        parameters = functions.get_parameters(
+        functions.save_parameters(
+            RUN_DIR,
             learning_value=LEARNING_VALUE,
-            nb_iteration=NB_ITERATIONS,
+            nb_iterations=NB_ITERATIONS,
             recording_interval=RECORDING_INTERVAL,
         )
-        with open(os.path.join(RUN_DIR, "parameters.json"), "w") as f:
-            f.write(json.dumps(parameters))
 
         print("Running simulation")
         functions.run_simulation(RUN_DIR)
@@ -69,8 +63,7 @@ if __name__ == "__main__":
 
     df = functions.read_leg_results(RUN_DIR)
 
-    weights = functions.read_sim_weight_results(RUN_DIR)
-    simulated_tt = weights["points"]
+    ttf = functions.read_net_cond_sim_edge_ttfs(RUN_DIR)
 
     print("Computing theoretical results")
     parameters = {
@@ -182,18 +175,16 @@ if __name__ == "__main__":
             color="black",
             linestyle="dashed",
         )
-    ts = np.arange(
-        functions.PERIOD[0],
-        functions.PERIOD[0] + len(weights["points"]) * weights["interval_x"],
-        weights["interval_x"],
-    )
     tts = np.fromiter(
-        (theoretical_solution.travel_time(t, denominator, times, parameters) for t in ts),
+        (
+            theoretical_solution.travel_time(t, denominator, times, parameters)
+            for t in ttf["departure_time"]
+        ),
         dtype=np.float64,
     )
     ax.plot(
-        ts,
-        weights["points"],
+        ttf["departure_time"],
+        ttf["travel_time"],
         color=mpl_utils.CMP(1),
         alpha=0.7,
         label="Simulated",
@@ -206,7 +197,7 @@ if __name__ == "__main__":
         alpha=0.7,
         label="Analytical",
     )
-    m = max(weights["points"]) - np.max(tts)
+    m = max(ttf["travel_time"]) - np.max(tts)
     print("Difference between maximum simulated and theoretical travel time: {:.2f}s".format(m))
     ax.legend()
     ax.set_xlabel("Departure time $t$")

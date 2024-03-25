@@ -519,7 +519,7 @@ def plot_inverse_sampling(times, denominator, params, filename=None, u=0.4):
         linestyle="dashed",
     )
     ax.plot(ts, cum_distr, alpha=1.0, color=mpl_utils.CMP(0))
-    ax.set_xlabel("Departure time $t$")
+    ax.set_xlabel(r"Departure time $t^{\text{d}}$")
     ax.set_xlim(params["period"][0], params["period"][1])
     ax.set_ylabel(r"Cumulative probability $F^{\text{d}}_n(t)$")
     ax.set_ylim(0, 1)

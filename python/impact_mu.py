@@ -1,6 +1,5 @@
 # How METROPOLIS2 convergence varies with mu.
 import os
-import json
 
 import numpy as np
 
@@ -45,19 +44,14 @@ if __name__ == "__main__":
                 os.makedirs(directory)
 
             print("Writing input")
-            agents = functions.get_agents(N, departure_time_mu=parameter)
-            with open(os.path.join(directory, "agents.json"), "w") as f:
-                f.write(json.dumps(agents))
-            road_network = functions.get_road_network(bottleneck_flow=BOTTLENECK_FLOW)
-            with open(os.path.join(directory, "road-network.json"), "w") as f:
-                f.write(json.dumps(road_network))
-            parameters = functions.get_parameters(
+            functions.save_agents(directory, nb_agents=N, departure_time_mu=parameter)
+            functions.save_road_network(directory, bottleneck_flow=BOTTLENECK_FLOW)
+            functions.save_parameters(
+                directory,
                 learning_value=LEARNING_VALUE[parameter],
-                nb_iteration=NB_ITERATIONS,
+                nb_iterations=NB_ITERATIONS,
                 recording_interval=RECORDING_INTERVAL,
             )
-            with open(os.path.join(directory, "parameters.json"), "w") as f:
-                f.write(json.dumps(parameters))
 
             print("Running simulation")
             functions.run_simulation(directory)

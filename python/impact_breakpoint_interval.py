@@ -1,6 +1,5 @@
 # How METROPOLIS2 convergence varies with the breakpoint interval.
 import os
-import json
 
 import numpy as np
 
@@ -50,19 +49,14 @@ if __name__ == "__main__":
                 os.makedirs(directory)
 
             print("Writing input")
-            agents = functions.get_agents(N, departure_time_mu=MU)
-            with open(os.path.join(directory, "agents.json"), "w") as f:
-                f.write(json.dumps(agents))
-            road_network = functions.get_road_network(bottleneck_flow=BOTTLENECK_FLOW)
-            with open(os.path.join(directory, "road-network.json"), "w") as f:
-                f.write(json.dumps(road_network))
-            parameters = functions.get_parameters(
+            functions.save_agents(directory, nb_agents=N, departure_time_mu=MU)
+            functions.save_road_network(directory, bottleneck_flow=BOTTLENECK_FLOW)
+            functions.save_parameters(
+                directory,
                 learning_value=LEARNING_VALUE,
-                nb_iteration=NB_ITERATIONS,
+                nb_iterations=NB_ITERATIONS,
                 recording_interval=parameter,
             )
-            with open(os.path.join(directory, "parameters.json"), "w") as f:
-                f.write(json.dumps(parameters))
 
             print("Running simulation")
             functions.run_simulation(directory)
@@ -198,39 +192,16 @@ if __name__ == "__main__":
         )
     for i, (parameter, df) in enumerate(zip(PARAMETERS, iteration_results)):
         directory = os.path.join(RUN_DIR, f"{i}")
-        weights = functions.read_sim_weight_results(directory)
-        simulated_tt = weights["points"]
-        ts = np.arange(
-            functions.PERIOD[0],
-            functions.PERIOD[0] + len(weights["points"]) * weights["interval_x"],
-            weights["interval_x"],
-        )
+        ttf = functions.read_net_cond_sim_edge_ttfs(directory)
         ax.plot(
-            ts,
-            weights["points"],
+            ttf["departure_time"],
+            ttf["travel_time"],
             "-o",
             markersize=3,
             color=mpl_utils.CMP(1 + i),
             alpha=0.7,
             label=r"$\delta =$\:{}".format(seconds_to_travel_time_str(parameter)),
         )
-    #  ts = np.arange(
-    #  functions.PERIOD[0],
-    #  functions.PERIOD[1] + 1.0,
-    #  1.0,
-    #  )
-    #  tts = np.fromiter(
-    #  (theoretical_solution.travel_time(t, denominator, times, parameters) for t in ts),
-    #  dtype=np.float64,
-    #  )
-    #  ax.plot(
-    #  ts,
-    #  tts,
-    #  linestyle="dashed",
-    #  color=mpl_utils.CMP(0),
-    #  alpha=0.7,
-    #  label="Analytical",
-    #  )
     ax.legend()
     ax.set_xlabel("Departure time $t$")
     ax.set_xlim(functions.PERIOD[0], functions.PERIOD[1])

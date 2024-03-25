@@ -5,7 +5,6 @@
 # the travel times of the first iteration.
 # Therefore, the travel times are supposed to be well anticipated for the second iteration.
 import os
-import json
 
 import functions
 
@@ -20,25 +19,18 @@ if __name__ == "__main__":
         os.makedirs(RUN_DIR)
 
     print("Writing agents")
-    agents = functions.get_agents(
-        N,
+    functions.save_agents(
+        RUN_DIR,
+        nb_agents=N,
         exogenous_departure_time=True,
         exogenous_departure_time_period=[7 * 3600 + 900, 8 * 3600 + 2700],
     )
-    with open(os.path.join(RUN_DIR, "agents.json"), "w") as f:
-        f.write(json.dumps(agents))
 
     print("Writing road network")
-    road_network = functions.get_road_network(bottleneck_flow=N / 2000)
-    with open(os.path.join(RUN_DIR, "road-network.json"), "w") as f:
-        f.write(json.dumps(road_network))
+    functions.save_road_network(RUN_DIR, bottleneck_flow=N / 2000)
 
     print("Writing parameters")
-    parameters = functions.get_parameters(
-        learning_value=0.0, nb_iteration=2, recording_interval=1.0
-    )
-    with open(os.path.join(RUN_DIR, "parameters.json"), "w") as f:
-        f.write(json.dumps(parameters))
+    functions.save_parameters(RUN_DIR, learning_value=0.0, nb_iterations=2, recording_interval=1.0)
 
     print("Running simulation")
     functions.run_simulation(RUN_DIR)

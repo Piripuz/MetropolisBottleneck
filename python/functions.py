@@ -4,7 +4,6 @@ import json
 import subprocess
 import numpy as np
 import polars as pl
-import zstandard as zstd
 
 # Time window of feasible departure times (in seconds).
 PERIOD = [7.0 * 3600.0, 8.0 * 3600.0]
@@ -23,7 +22,9 @@ DELTA = 0.0 * 60.0
 # Free-flow travel time from origin to destination, in seconds.
 TT0 = 30.0
 # Path to the METROPOLIS2 executable.
-METROPOLIS_EXEC = "./execs/metropolis"
+METROPOLIS_EXEC = "./execs/metropolis_cli"
+# If True, the input and output files use the Parquet format, otherwise they use the CSV format.
+USE_PARQUET = True
 
 # Width of the departure-time choice intervals (for Multinomial logit departure time only).
 DT_WIDTH = 60.0
@@ -38,7 +39,8 @@ def seconds_to_time_str(t):
     return f"{h:02}:{m:02}:{s:02}"
 
 
-def get_agents(
+def save_agents(
+    directory,
     nb_agents=1000,
     departure_time_mu=1.0,
     exogenous_departure_time=False,
@@ -48,126 +50,141 @@ def get_agents(
     tstar_std=0.0,
     multinomial=False,
 ):
-    agents = list()
     if random_seed is None:
         random_seed = RANDOM_SEED
-    rng = np.random.default_rng(RANDOM_SEED)
-    random_dt = iter(
-        rng.uniform(
+    rng = np.random.default_rng(random_seed)
+    if uniform_epsilons:
+        us = np.arange(0.0, 1.0, 1 / nb_agents)
+    else:
+        us = rng.uniform(size=nb_agents)
+    # === Agent-level DataFrame ===
+    agents = pl.DataFrame({"agent_id": pl.int_range(1, nb_agents + 1, eager=True)})
+    # === Alternative-level DataFrame ===
+    alternatives = pl.DataFrame(
+        {
+            "agent_id": pl.int_range(1, nb_agents + 1, eager=True),
+            "alt_id": pl.int_range(1, nb_agents + 1, eager=True),
+        }
+    )
+    if exogenous_departure_time:
+        departure_times = rng.uniform(
             exogenous_departure_time_period[0], exogenous_departure_time_period[1], size=nb_agents
         )
-    )
-    if uniform_epsilons:
-        random_u = iter(np.arange(0.0, 1.0, 1 / nb_agents))
+        alternatives = alternatives.with_columns(
+            pl.lit("Constant").alias("dt_choice.type"),
+            pl.lit(departure_times).alias("dt_choice.departure_time"),
+        )
+    elif multinomial:
+        offsets = rng.uniform(-DT_WIDTH / 2, DT_WIDTH / 2, size=nb_agents)
+        alternatives = alternatives.with_columns(
+            pl.lit("Discrete").alias("dt_choice.type"),
+            pl.lit(DT_WIDTH).alias("dt_choice.interval"),
+            pl.lit(offsets).alias("dt_choice.offset"),
+            pl.lit("Logit").alias("dt_choice.model.type"),
+            pl.lit(us).alias("dt_choice.model.u"),
+            pl.lit(departure_time_mu).alias("dt_choice.model.mu"),
+        )
     else:
-        random_u = iter(rng.uniform(size=nb_agents))
+        alternatives = alternatives.with_columns(
+            pl.lit("Continuous").alias("dt_choice.type"),
+            pl.lit("Logit").alias("dt_choice.model.type"),
+            pl.lit(us).alias("dt_choice.model.u"),
+            pl.lit(departure_time_mu).alias("dt_choice.model.mu"),
+        )
     if tstar_std == 0:
         # Same t*.
         tstars = np.repeat(TSTAR, nb_agents)
     else:
         tstars = rng.normal(TSTAR, tstar_std, size=nb_agents)
-    tstars_iter = iter(tstars)
-    for i in range(nb_agents):
-        tstar = next(tstars_iter)
-        leg = {
-            "class": {
-                "type": "Road",
-                "value": {
-                    "origin": 0,
-                    "destination": 1,
-                    "vehicle": 0,
-                },
-            },
-            "travel_utility": {
-                "type": "Polynomial",
-                "value": {
-                    "b": -ALPHA / 3600.0,
-                },
-            },
-            "schedule_utility": {
-                "type": "AlphaBetaGamma",
-                "value": {
-                    "beta": BETA / 3600.0,
-                    "gamma": GAMMA / 3600.0,
-                    "t_star_low": tstar - DELTA,
-                    "t_star_high": tstar + DELTA,
-                },
-            },
-        }
-        if exogenous_departure_time:
-            departure_time_model = {
-                "type": "Constant",
-                "value": next(random_dt),
-            }
-        elif multinomial:
-            departure_time_model = {
-                "type": "DiscreteChoice",
-                "value": {
-                    "values": DT_BINS,
-                    "choice_model": {
-                        "type": "Deterministic",
-                        "value": {
-                            "u": next(random_u),
-                            "constants": list(
-                                rng.gumbel(scale=departure_time_mu, size=len(DT_BINS))
-                            ),
-                        },
-                    },
-                    "offset": rng.uniform(-DT_WIDTH / 2, DT_WIDTH / 2),
-                },
-            }
-        else:
-            departure_time_model = {
-                "type": "ContinuousChoice",
-                "value": {
-                    "period": PERIOD,
-                    "choice_model": {
-                        "type": "Logit",
-                        "value": {
-                            "u": next(random_u),
-                            "mu": departure_time_mu,
-                        },
-                    },
-                },
-            }
-        car_mode = {
-            "type": "Trip",
-            "value": {
-                "legs": [leg],
-                "departure_time_model": departure_time_model,
-            },
-        }
-        agent = {
-            "id": i,
-            "modes": [car_mode],
-        }
-        agents.append(agent)
-    if tstar_std > 0.0:
         print(
             "t* is ranged between {} and {}".format(
                 seconds_to_time_str(np.min(tstars)), seconds_to_time_str(np.max(tstars))
             )
         )
-    return agents
+    alternatives = alternatives.with_columns(
+        pl.lit(-ALPHA / 3600.0).alias("total_travel_utility.one"),
+        pl.lit("AlphaBetaGamma").alias("destination_utility.type"),
+        pl.lit(tstars).alias("destination_utility.tstar"),
+        pl.lit(BETA / 3600.0).alias("destination_utility.beta"),
+        pl.lit(GAMMA / 3600.0).alias("destination_utility.gamma"),
+        pl.lit(DELTA).alias("destination_utility.delta"),
+    )
+    # === Trip-level DataFrame ===
+    trips = pl.DataFrame(
+        {
+            "agent_id": pl.int_range(1, nb_agents + 1, eager=True),
+            "alt_id": pl.int_range(1, nb_agents + 1, eager=True),
+            "trip_id": pl.int_range(1, nb_agents + 1, eager=True),
+            "class.type": "Road",
+            "class.origin": 0,
+            "class.destination": 1,
+            "class.vehicle": 0,
+        }
+    )
+    if not os.path.isdir(directory):
+        os.makedirs(directory)
+    if USE_PARQUET:
+        agents.write_parquet(os.path.join(directory, "agents.parquet"))
+        alternatives.write_parquet(os.path.join(directory, "alts.parquet"))
+        trips.write_parquet(os.path.join(directory, "trips.parquet"))
+    else:
+        agents.write_csv(os.path.join(directory, "agents.csv"))
+        alternatives.write_csv(os.path.join(directory, "alts.csv"))
+        trips.write_csv(os.path.join(directory, "trips.csv"))
 
 
-def get_parameters(learning_value=0.01, recording_interval=1.0, nb_iteration=100):
+def save_road_network(directory, bottleneck_flow):
+    edges = pl.DataFrame(
+        {
+            "edge_id": [1],
+            "source": [0],
+            "target": [1],
+            "speed": [1.0],
+            "length": [TT0],
+            "bottleneck_flow": bottleneck_flow,
+        }
+    )
+    vehicles = pl.DataFrame(
+        {
+            "vehicle_id": [0],
+            "headway": [1.0],
+            "pce": [1.0],
+        }
+    )
+    if not os.path.isdir(directory):
+        os.makedirs(directory)
+    if USE_PARQUET:
+        edges.write_parquet(os.path.join(directory, "edges.parquet"))
+        vehicles.write_parquet(os.path.join(directory, "vehicles.parquet"))
+    else:
+        edges.write_csv(os.path.join(directory, "edges.csv"))
+        vehicles.write_csv(os.path.join(directory, "vehicles.csv"))
+
+
+def save_parameters(directory, learning_value=0.01, recording_interval=1.0, nb_iterations=100):
+    if USE_PARQUET:
+        ext = "parquet"
+        fmt = "Parquet"
+    else:
+        ext = "csv"
+        fmt = "CSV"
     parameters = {
-        "period": PERIOD,
-        "network": {
-            "road_network": {
-                "recording_interval": recording_interval,
-                "spillback": False,
-                "max_pending_duration": 0.0,
-            }
+        "input_files": {
+            "agents": f"agents.{ext}",
+            "alternatives": f"alts.{ext}",
+            "trips": f"trips.{ext}",
+            "edges": f"edges.{ext}",
+            "vehicle_types": f"vehicles.{ext}",
         },
-        "stopping_criteria": [
-            {
-                "type": "MaxIteration",
-                "value": nb_iteration,
-            }
-        ],
-        "saving_format": "Parquet",
+        "output_directory": "output",
+        "period": PERIOD,
+        "road_network": {
+            "recording_interval": recording_interval,
+            "spillback": False,
+            "max_pending_duration": 0.0,
+        },
+        "max_iterations": nb_iterations,
+        "saving_format": fmt,
     }
     if (
         learning_value == 0.0
@@ -180,51 +197,39 @@ def get_parameters(learning_value=0.01, recording_interval=1.0, nb_iteration=100
             "type": "Exponential",
             "value": learning_value,
         }
-    return parameters
+    if not os.path.isdir(directory):
+        os.makedirs(directory)
+    with open(os.path.join(directory, "parameters.json"), "w") as f:
+        f.write(json.dumps(parameters))
 
 
-def get_road_network(bottleneck_flow):
-    return {
-        "graph": {
-            "edges": [
-                [
-                    0,
-                    1,
-                    {"id": 1, "base_speed": 1.0, "length": TT0, "bottleneck_flow": bottleneck_flow},
-                ]
-            ]
-        },
-        "vehicles": [{"length": 1.0, "pce": 1.0}],
-    }
-
-
-def run_simulation(directory, weights=None):
+def run_simulation(directory):
     command = [
         METROPOLIS_EXEC,
-        "--agents",
-        os.path.join(directory, "agents.json"),
-        "--road-network",
-        os.path.join(directory, "road-network.json"),
-        "--parameters",
         os.path.join(directory, "parameters.json"),
-        "--output",
-        os.path.join(directory, "output"),
     ]
-    if weights:
-        command.extend(["--weights", weights])
     subprocess.run(" ".join(command), shell=True)
 
 
 def read_iteration_results(directory):
-    return pl.read_parquet(os.path.join(directory, "output", "iteration_results.parquet"))
+    if USE_PARQUET:
+        return pl.read_parquet(os.path.join(directory, "output", "iteration_results.parquet"))
+    else:
+        return pl.read_csv(os.path.join(directory, "output", "iteration_results.csv"))
 
 
 def read_agent_results(directory):
-    return pl.read_parquet(os.path.join(directory, "output", "agent_results.parquet"))
+    if USE_PARQUET:
+        return pl.read_parquet(os.path.join(directory, "output", "agent_results.parquet"))
+    else:
+        return pl.read_csv(os.path.join(directory, "output", "agent_results.csv"))
 
 
 def read_leg_results(directory):
-    df = pl.read_parquet(os.path.join(directory, "output", "leg_results.parquet"))
+    if USE_PARQUET:
+        df = pl.read_parquet(os.path.join(directory, "output", "leg_results.parquet"))
+    else:
+        df = pl.read_csv(os.path.join(directory, "output", "leg_results.csv"))
     df = df.with_columns(
         (pl.col("arrival_time") - pl.col("departure_time")).alias("travel_time"),
         (pl.col("exp_arrival_time") - pl.col("departure_time")).alias("exp_travel_time"),
@@ -233,20 +238,20 @@ def read_leg_results(directory):
     return df
 
 
-def read_sim_weight_results(directory):
-    dctx = zstd.ZstdDecompressor()
-    with open(os.path.join(directory, "output", "sim_weight_results.json.zst"), "br") as f:
-        reader = dctx.stream_reader(f)
-        data = json.load(reader)
-    return data["road_network"][0]["1"]
+def read_net_cond_sim_edge_ttfs(directory):
+    if USE_PARQUET:
+        df = pl.read_parquet(os.path.join(directory, "output", "net_cond_sim_edge_ttfs.parquet"))
+    else:
+        df = pl.read_csv(os.path.join(directory, "output", "net_cond_sim_edge_ttfs.csv"))
+    return df.select("departure_time", "travel_time")
 
 
-def read_exp_weight_results(directory):
-    dctx = zstd.ZstdDecompressor()
-    with open(os.path.join(directory, "output", "next_exp_weight_results.json.zst"), "br") as f:
-        reader = dctx.stream_reader(f)
-        data = json.load(reader)
-    return data["road_network"][0]["1"]
+def read_net_cond_exp_edge_ttfs(directory):
+    if USE_PARQUET:
+        df = pl.read_parquet(os.path.join(directory, "output", "net_cond_next_exp_edge_ttfs.parquet"))
+    else:
+        df = pl.read_csv(os.path.join(directory, "output", "net_cond_next_exp_edge_ttfs.csv"))
+    return df
 
 
 def read_running_time(directory):
