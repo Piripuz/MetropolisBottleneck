@@ -83,12 +83,12 @@ if __name__ == "__main__":
         iteration_results.append(iter_df)
         print(
             "Exp. travel time diff RMSE: {:.1E}".format(
-                iter_df["road_leg_exp_travel_time_diff_rmse"][-1]
+                iter_df["road_trip_exp_travel_time_diff_rmse"][-1]
             )
         )
-        print("Exp weight RMSE: {:.1E}".format(iter_df["exp_road_network_weights_rmse"][-1]))
-        print("Dep. time RMSE: {:.1E}".format(iter_df["trip_dep_time_rmse"][-1]))
-        print("Average travel time: {:.4f}s".format(iter_df["road_leg_travel_time_mean"][-1]))
+        print("Exp weight RMSE: {:.1E}".format(iter_df["exp_road_network_cond_rmse"][-1]))
+        print("Dep. time RMSE: {:.1E}".format(iter_df["alt_dep_time_rmse"][-1]))
+        print("Average travel time: {:.4f}s".format(iter_df["road_trip_travel_time_mean"][-1]))
         print("Surplus: {:.4f}".format(iter_df["surplus_mean"][-1]))
 
     main_df = functions.read_iteration_results(MAIN_DIR)
@@ -100,14 +100,14 @@ if __name__ == "__main__":
     for i, (mu, df) in enumerate(zip(MUS, iteration_results)):
         ax.plot(
             xs,
-            df["trip_dep_time_rmse"],
+            df["alt_dep_time_rmse"],
             alpha=0.5,
             color=mpl_utils.CMP(i + 1),
             label=r"Heterogeneous $\mu = {}$".format(mu),
         )
     ax.plot(
         xs,
-        main_df["trip_dep_time_rmse"][:NB_ITERATIONS],
+        main_df["alt_dep_time_rmse"][:NB_ITERATIONS],
         alpha=0.5,
         color=mpl_utils.CMP(0),
         label=r"Homogeneous $\mu = 1.0$",

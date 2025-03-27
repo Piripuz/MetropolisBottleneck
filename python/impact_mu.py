@@ -89,11 +89,11 @@ if __name__ == "__main__":
 
         df = functions.read_iteration_results(directory)
         iteration_results.append(df)
-        print("Exp. travel time RMSE: {:.1E}".format(df["road_leg_exp_travel_time_diff_rmse"][-1]))
-        print("Exp weight RMSE: {:.1E}".format(df["exp_road_network_weights_rmse"][-1]))
-        print("Dep. time RMSE: {:.1E}".format(df["trip_dep_time_rmse"][-1]))
+        print("Exp. travel time RMSE: {:.1E}".format(df["road_trip_exp_travel_time_diff_rmse"][-1]))
+        print("Exp weight RMSE: {:.1E}".format(df["exp_road_network_cond_rmse"][-1]))
+        print("Dep. time RMSE: {:.1E}".format(df["alt_dep_time_rmse"][-1]))
 
-        print("Average travel time: {:.4f}s".format(df["road_leg_travel_time_mean"][-1]))
+        print("Average travel time: {:.4f}s".format(df["road_trip_travel_time_mean"][-1]))
         print("Surplus: {:.4f}".format(df["surplus_mean"][-1]))
 
     # Departure-time RMSE.
@@ -102,7 +102,7 @@ if __name__ == "__main__":
     for i, (parameter, df) in enumerate(zip(PARAMETERS, iteration_results)):
         ax.plot(
             xs,
-            df["trip_dep_time_rmse"],
+            df["alt_dep_time_rmse"],
             alpha=0.5,
             color=mpl_utils.CMP(i),
             label=r"$\mu = {}$".format(parameter),
@@ -122,7 +122,7 @@ if __name__ == "__main__":
     for i, (parameter, df) in enumerate(zip(PARAMETERS, iteration_results)):
         ax.plot(
             xs,
-            df["road_leg_exp_travel_time_diff_rmse"],
+            df["road_trip_exp_travel_time_diff_rmse"],
             alpha=0.7,
             color=mpl_utils.CMP(i),
             label=r"$\mu = ${}".format(parameter),
@@ -142,7 +142,7 @@ if __name__ == "__main__":
     for i, (parameter, df) in enumerate(zip(PARAMETERS, iteration_results)):
         ax.plot(
             xs,
-            df["exp_road_network_weights_rmse"],
+            df["exp_road_network_cond_rmse"],
             alpha=0.5,
             color=mpl_utils.CMP(i),
             label=r"$\mu = {}$".format(parameter),
@@ -162,7 +162,7 @@ if __name__ == "__main__":
     for i, (parameter, df) in enumerate(zip(PARAMETERS, iteration_results)):
         ax.plot(
             xs,
-            df["sim_road_network_weights_rmse"],
+            df["sim_road_network_cond_rmse"],
             alpha=0.5,
             color=mpl_utils.CMP(i),
             label=r"$\mu = {}$".format(parameter),

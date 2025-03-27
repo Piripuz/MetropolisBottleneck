@@ -94,11 +94,11 @@ if __name__ == "__main__":
     for i in range(NB_RUNS):
         directory = os.path.join(RUN_DIR, f"{i}")
         iter_df = functions.read_iteration_results(directory)
-        exp_tt_diff_rmses.append(iter_df["road_leg_exp_travel_time_diff_rmse"][-1])
-        exp_weights_rmse.append(iter_df["exp_road_network_weights_rmse"][-1])
-        dep_time_rmse.append(iter_df["trip_dep_time_rmse"][-1])
+        exp_tt_diff_rmses.append(iter_df["road_trip_exp_travel_time_diff_rmse"][-1])
+        exp_weights_rmse.append(iter_df["exp_road_network_cond_rmse"][-1])
+        dep_time_rmse.append(iter_df["alt_dep_time_rmse"][-1])
         surplus.append(iter_df["surplus_mean"][-1])
-        travel_times.append(iter_df["road_leg_travel_time_mean"][-1])
+        travel_times.append(iter_df["road_trip_travel_time_mean"][-1])
         df = functions.read_leg_results(directory)
         distances.append(
             theoretical_solution.distance_theoretical(df, times, denominator, parameters)

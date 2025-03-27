@@ -56,12 +56,12 @@ if __name__ == "__main__":
     iter_df = functions.read_iteration_results(RUN_DIR)
     print(
         "Exp. travel time diff RMSE: {:.1E}".format(
-            iter_df["road_leg_exp_travel_time_diff_rmse"][-1]
+            iter_df["road_trip_exp_travel_time_diff_rmse"][-1]
         )
     )
-    print("Exp weight RMSE: {:.1E}".format(iter_df["exp_road_network_weights_rmse"][-1]))
-    if iter_df["trip_dep_time_rmse"][-1]:
-        print("Dep. time RMSE: {:.1E}".format(iter_df["trip_dep_time_rmse"][-1]))
+    print("Exp condition RMSE: {:.1E}".format(iter_df["exp_road_network_cond_rmse"][-1]))
+    if iter_df["alt_dep_time_rmse"][-1]:
+        print("Dep. time RMSE: {:.1E}".format(iter_df["alt_dep_time_rmse"][-1]))
 
     df = functions.read_leg_results(RUN_DIR)
 
@@ -84,7 +84,7 @@ if __name__ == "__main__":
 
     print("Analyzing results")
     # Aggregate statistics.
-    print("Average travel time: {:.4f}s".format(iter_df["road_leg_travel_time_mean"][-1]))
+    print("Average travel time: {:.4f}s".format(iter_df["road_trip_travel_time_mean"][-1]))
     print("Surplus: {:.4f}".format(iter_df["surplus_mean"][-1]))
 
     # Computing distance between theory and simulation.
@@ -136,7 +136,7 @@ if __name__ == "__main__":
     bins = np.linspace(functions.PERIOD[0], functions.PERIOD[1], 200)
     ts2 = (bins[1:] + bins[:-1]) / 2
     simulated_td_rs, _ = np.histogram(df["departure_time"].to_numpy(), bins=bins, density=True)
-    simulated_ta_rs, _ = np.histogram(df["arrival_time"].to_numpy(), bins=bins, density=True)
+    simulated_ta_rs, _ = np.histogram((df["departure_time"] + df["travel_time"]).to_numpy(), bins=bins, density=True)
     fig, ax = mpl_utils.get_figure(fraction=0.8)
     ax.plot(
         ts2,
@@ -167,7 +167,7 @@ if __name__ == "__main__":
     fig, ax = mpl_utils.get_figure(fraction=0.8)
     ax.scatter(
         df["departure_time"],
-        df["arrival_time"] - df["departure_time"],
+        df["travel_time"],
         s=3,
         color=mpl_utils.CMP(0),
         alpha=0.9,
@@ -232,7 +232,7 @@ if __name__ == "__main__":
     )
     ax.scatter(
         df["departure_time"],
-        df["arrival_time"] - df["departure_time"],
+        df["travel_time"],
         s=1,
         color=mpl_utils.CMP(2),
         alpha=0.1,
@@ -255,14 +255,14 @@ if __name__ == "__main__":
     xs = list(range(1, NB_ITERATIONS + 1))
     ax.plot(
         xs,
-        iter_df["trip_dep_time_rmse"],
+        iter_df["alt_dep_time_rmse"],
         alpha=0.7,
         color=mpl_utils.CMP(0),
         label=r"$\text{RMSE}_{\kappa}^{\text{dep}}$",
     )
     ax.plot(
         xs,
-        iter_df["exp_road_network_weights_rmse"],
+        iter_df["exp_road_network_cond_rmse"],
         alpha=0.7,
         color=mpl_utils.CMP(1),
         label=r"$\text{RMSE}_{\kappa}^T$",
