@@ -233,7 +233,7 @@ def read_leg_results(directory):
         df_real = pl.read_csv(os.path.join(directory, "output", "net_cond_sim_edge_ttfs.parquet"))
         df_exp = pl.read_csv(os.path.join(directory, "output", "net_cond_exp_edge_ttfs.parquet"))
     df = df_real.with_columns(
-        (df_exp["travel_time"] - df_real["travel_time"]).alias("exp_travel_time"),
+        df_exp["travel_time"].alias("exp_travel_time"),
     )
     df = df.with_columns((pl.col("travel_time") - pl.col("exp_travel_time")).alias("tt_diff"))
     return df
