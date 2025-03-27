@@ -227,12 +227,13 @@ def read_agent_results(directory):
 
 def read_leg_results(directory):
     if USE_PARQUET:
-        df = pl.read_parquet(os.path.join(directory, "output", "leg_results.parquet"))
+        df_real = pl.read_parquet(os.path.join(directory, "output", "net_cond_sim_edge_ttfs.parquet"))
+        df_exp = pl.read_parquet(os.path.join(directory, "output", "net_cond_exp_edge_ttfs.parquet"))
     else:
-        df = pl.read_csv(os.path.join(directory, "output", "leg_results.csv"))
-    df = df.with_columns(
-        (pl.col("arrival_time") - pl.col("departure_time")).alias("travel_time"),
-        (pl.col("exp_arrival_time") - pl.col("departure_time")).alias("exp_travel_time"),
+        df_real = pl.read_csv(os.path.join(directory, "output", "net_cond_sim_edge_ttfs.parquet"))
+        df_exp = pl.read_csv(os.path.join(directory, "output", "net_cond_exp_edge_ttfs.parquet"))
+    df = df_real.with_columns(
+        (df_exp["travel_time"] - df_real["travel_time"]).alias("exp_travel_time"),
     )
     df = df.with_columns((pl.col("travel_time") - pl.col("exp_travel_time")).alias("tt_diff"))
     return df
@@ -257,4 +258,4 @@ def read_net_cond_exp_edge_ttfs(directory):
 def read_running_time(directory):
     with open(os.path.join(directory, "output", "running_times.json")) as f:
         data = json.load(f)
-    return float(data["total"])
+    return float(data["total"]["secs"])
