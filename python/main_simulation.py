@@ -136,7 +136,7 @@ if __name__ == "__main__":
     bins = np.linspace(functions.PERIOD[0], functions.PERIOD[1], 200)
     ts2 = (bins[1:] + bins[:-1]) / 2
     simulated_td_rs, _ = np.histogram(df["departure_time"].to_numpy(), bins=bins, density=True)
-    simulated_ta_rs, _ = np.histogram((df["departure_time"] + df["travel_time"]).to_numpy(), bins=bins, density=True)
+    simulated_ta_rs, _ = np.histogram(df["arrival_time"].to_numpy(), bins=bins, density=True)
     fig, ax = mpl_utils.get_figure(fraction=0.8)
     ax.plot(
         ts2,
